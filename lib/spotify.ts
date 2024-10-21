@@ -3,6 +3,8 @@ import {
   NumericAudioFeatures,
   NumericRecommendationsProps,
 } from "@/interfaces/spotify";
+import QRCode from "qrcode";
+import fs from "fs/promises";
 
 interface Track {
   preview_url: string | null;
@@ -140,6 +142,65 @@ export async function recommendationsSample() {
 
   return response;
 }
+
+export async function createPlaylistWithOptionalImageAndQR(
+  tracks: ExtractedTrackInfo[],
+  userId: string,
+  playlistName: string,
+  imagePath?: string
+): Promise<string> {
+  const spotify = SpotifyApi.withClientCredentials(
+    process.env.SPOTIFY_CLIENT_ID || "",
+    process.env.SPOTIFY_CLIENT_SECRET || ""
+  );
+
+  try {
+    // Step 1: Create a new playlist
+    const playlist = await spotify.playlists.createPlaylist(userId, {
+      name: playlistName,
+      public: false,
+      description: "Playlist created from extracted tracks",
+    });
+
+    // Step 2: Add tracks to the playlist
+    const trackUris = tracks.map((track) => `spotify:track:${track.id}`);
+    await spotify.playlists.addItemsToPlaylist(playlist.id, trackUris);
+
+    // Step 3: Set playlist image (if provided)
+    if (imagePath) {
+      try {
+        const imageData = await fs.readFile(imagePath);
+        const base64Image = imageData.toString("base64");
+        await spotify.playlists.addCustomPlaylistCoverImageFromBase64String(
+          playlist.id,
+          base64Image
+        );
+      } catch (imageError) {
+        console.error("Error setting playlist image:", imageError);
+        // Continue execution even if image upload fails
+      }
+    }
+
+    // Step 4: Get the playlist URL
+    const playlistUrl = playlist.external_urls.spotify;
+
+    // Step 5: Generate QR code
+    const qrCodeDataUrl = await QRCode.toDataURL(playlistUrl);
+
+    return qrCodeDataUrl;
+  } catch (error) {
+    console.error("Error creating playlist or generating QR code:", error);
+    throw error;
+  }
+}
+
+// Usage example:
+// const extractedTracks = extractTrackInfo(responseData);
+// const userId = "your_spotify_user_id";
+// const playlistName = "My Custom Playlist";
+// const imagePath = "/path/to/your/image.jpg"; // Optional
+// const qrCodeDataUrl = await createPlaylistWithOptionalImageAndQR(extractedTracks, userId, playlistName, imagePath);
+// console.log("QR Code Data URL:", qrCodeDataUrl);
 
 export const availableGenres = [
   "acoustic",
