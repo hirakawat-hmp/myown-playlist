@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { sample } from "@/lib/spotify";
+import { recommendationsSample } from "@/lib/spotify";
 
 export async function GET() {
-  const res = await sample();
+  const res = await recommendationsSample();
   return NextResponse.json(res);
 }
