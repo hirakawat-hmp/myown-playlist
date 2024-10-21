@@ -9,6 +9,13 @@ interface Track {
   name: string;
   artists: Array<{ name: string }>;
   id: string;
+  album: {
+    images: Array<{
+      url: string;
+      height: number;
+      width: number;
+    }>;
+  };
 }
 
 interface ExtractedTrackInfo {
@@ -16,6 +23,11 @@ interface ExtractedTrackInfo {
   name: string;
   artists: string;
   id: string;
+  albumImageUrl: string;
+}
+
+interface EnhancedTrackInfo extends ExtractedTrackInfo {
+  audioFeatures: NumericAudioFeatures;
 }
 
 const spotify = SpotifyApi.withClientCredentials(
@@ -43,11 +55,43 @@ function extractTrackInfo(data: { tracks: Track[] }): ExtractedTrackInfo[] {
     .filter((track) => track.preview_url !== null)
     .slice(0, 20)
     .map((track) => ({
-      preview_url: track.preview_url as string, // Type assertion because we know it's not null
+      preview_url: track.preview_url as string,
       name: track.name,
       artists: track.artists.map((artist) => artist.name).join(", "),
       id: track.id,
+      albumImageUrl: track.album.images[0]?.url || "",
     }));
+}
+
+async function getEnhancedTrackInfo(
+  tracks: ExtractedTrackInfo[]
+): Promise<EnhancedTrackInfo[]> {
+  // Step 1: Extract track IDs
+  const trackIds = tracks.map((track) => track.id);
+
+  // Step 2: Fetch audio features from Spotify API
+  const response = await spotify.tracks.audioFeatures(trackIds);
+
+  // Step 3 & 4: Combine track info with audio features
+  return tracks.map((track, index) => {
+    const features = response[index];
+    const relevantFeatures: NumericAudioFeatures = {
+      acousticness: features.acousticness,
+      danceability: features.danceability,
+      energy: features.energy,
+      instrumentalness: features.instrumentalness,
+      liveness: features.liveness,
+      loudness: features.loudness,
+      speechiness: features.speechiness,
+      tempo: features.tempo,
+      valence: features.valence,
+    };
+
+    return {
+      ...track,
+      audioFeatures: relevantFeatures,
+    };
+  });
 }
 
 function getRecommendationsProps(
@@ -92,7 +136,9 @@ export async function recommendationsSample() {
   const genres = ["j-dance", "j-idol", "j-pop", "j-rock"];
   const items = await recommendations(numericAudioFeatures, genres);
   const res = extractTrackInfo(items);
-  return { info: res };
+  const response = getEnhancedTrackInfo(res);
+
+  return response;
 }
 
 export const availableGenres = [
