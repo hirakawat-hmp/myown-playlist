@@ -133,6 +133,21 @@ export async function recommendations(
   return items;
 }
 
+export async function recommendation(
+  NumericRecommendationsProps: NumericRecommendationsProps
+) {
+  const items = await spotify.recommendations.get({
+    market: "JP",
+    limit: 100,
+    seed_artists: [""],
+    seed_tracks: [""],
+    min_popularity: 30,
+    max_popularity: 100,
+    ...NumericRecommendationsProps,
+  });
+  return items;
+}
+
 export async function recommendationsSample() {
   const numericAudioFeatures = gerRandomNumericAudioFeature();
   const genres = ["j-dance", "j-idol", "j-pop", "j-rock"];
